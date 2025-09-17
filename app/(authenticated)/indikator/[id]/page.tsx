@@ -1,9 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Database, FileText, MapPin, Building, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Calendar, Database, FileText, MapPin, Building, TrendingUp, BarChart3, Table } from 'lucide-react';
+import FilterPanel, { FilterState } from './components/FilterPanel';
+import DataTable from './components/DataTable';
+import ChartView from './components/ChartView';
 
 interface IndikatorDetailData {
   id: number;
@@ -31,6 +34,29 @@ export default function IndikatorPage() {
   const [data, setData] = useState<IndikatorDetailData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    tahun: [],
+    regional: [],
+    provinsi: [],
+    kota: [],
+    fieldName: []
+  });
+  const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table');
+
+  // Filter data based on current filters (excluding Indonesia national data from display)
+  const filteredData = useMemo(() => {
+    return data.filter(item => {
+      // Always exclude Indonesia national data from regular display
+      if (item.regional === 'Nasional' && item.provinsi === 'Indonesia') return false;
+      
+      if (filters.tahun.length > 0 && !filters.tahun.includes(item.tahun)) return false;
+      if (filters.regional.length > 0 && !filters.regional.includes(item.regional)) return false;
+      if (filters.provinsi.length > 0 && !filters.provinsi.includes(item.provinsi)) return false;
+      if (filters.kota.length > 0 && !filters.kota.includes(item.kota)) return false;
+      if (filters.fieldName.length > 0 && !filters.fieldName.includes(item.fieldName)) return false;
+      return true;
+    });
+  }, [data, filters]);
 
   useEffect(() => {
     const fetchIndikatorData = async () => {
@@ -159,121 +185,100 @@ export default function IndikatorPage() {
         )}
       </div>
 
-      {/* Metadata Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <div className="flex items-center mb-2">
-            <FileText className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Sumber</span>
-          </div>
-          <p className="text-gray-900 dark:text-white font-medium">
-            {firstItem.sumber || 'Tidak tersedia'}
-          </p>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <div className="flex items-center mb-2">
-            <Calendar className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Update Terakhir</span>
-          </div>
-          <p className="text-gray-900 dark:text-white font-medium">
-            {firstItem.lastupdate || 'Tidak tersedia'}
-          </p>
-        </div>
-        
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <div className="flex items-center mb-2">
-            <MapPin className="w-5 h-5 text-gray-600 dark:text-gray-400 mr-2" />
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Regional</span>
-          </div>
-          <p className="text-gray-900 dark:text-white font-medium">
-            {firstItem.regional}
-          </p>
-        </div>
-      </div>
-
-      {/* Data Table */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-            <Database className="w-5 h-5 mr-2" />
-            Data Detail
-          </h3>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Tahun
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Provinsi
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Kota
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Field
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Nilai
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Satuan
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {data.map((item, index) => (
-                <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {item.tahun}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {item.provinsi}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {item.kota || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {item.fieldName}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {item.dataValue}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                    {item.satuan || '-'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       {/* Summary Stats */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {data.length}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Total Data Points</p>
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-3xl font-bold mb-1">
+                {filteredData.length}
+              </p>
+              <p className="text-blue-100 text-sm font-medium">Total Data Points</p>
+            </div>
+            <div className="bg-white/20 rounded-lg p-3">
+              <Database className="w-8 h-8" />
+            </div>
+          </div>
         </div>
         
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {new Set(data.map(item => item.provinsi)).size}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Provinsi</p>
+        <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 text-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-3xl font-bold mb-1">
+                {new Set(filteredData.map(item => item.provinsi)).size}
+              </p>
+              <p className="text-emerald-100 text-sm font-medium">Provinsi</p>
+            </div>
+            <div className="bg-white/20 rounded-lg p-3">
+              <MapPin className="w-8 h-8" />
+            </div>
+          </div>
         </div>
         
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            {Math.max(...data.map(item => item.tahun)) - Math.min(...data.map(item => item.tahun)) + 1}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Rentang Tahun</p>
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-3xl font-bold mb-1">
+                {data.length > 0 ? `${Math.min(...data.map(item => item.tahun))} - ${Math.max(...data.map(item => item.tahun))}` : '-'}
+              </p>
+              <p className="text-purple-100 text-sm font-medium">Tahun Tersedia</p>
+            </div>
+            <div className="bg-white/20 rounded-lg p-3">
+              <Calendar className="w-8 h-8" />
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Content Layout with Sidebar */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Sidebar - Filter Panel */}
+        <div className="lg:w-80 lg:flex-shrink-0">
+          <FilterPanel data={data} onFilterChange={setFilters} />
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 min-w-0">
+          {/* Navigation Tabs */}
+          <div className="mb-6">
+            <div className="border-b border-gray-200 dark:border-gray-700">
+              <nav className="-mb-px flex space-x-8">
+                <button
+                  onClick={() => setActiveTab('table')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                    activeTab === 'table'
+                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <Table className="w-4 h-4 mr-2" />
+                    Tabel Data
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('chart')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                    activeTab === 'chart'
+                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    Grafik
+                  </div>
+                </button>
+              </nav>
+            </div>
+          </div>
+
+          {/* Content based on active tab */}
+          {activeTab === 'table' ? (
+            <DataTable data={filteredData} />
+          ) : (
+            <ChartView data={filteredData} fullData={data} />
+          )}
         </div>
       </div>
     </div>
