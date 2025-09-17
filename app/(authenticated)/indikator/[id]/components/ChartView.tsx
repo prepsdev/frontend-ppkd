@@ -3,7 +3,17 @@
 import { useState, useMemo } from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
-import { BarChart3, LineChart, PieChart, TrendingUp, ScatterChart, Group, TrendingDown } from 'lucide-react';
+import HighchartsTreemap from 'highcharts/modules/treemap';
+import HighchartsExporting from 'highcharts/modules/exporting';
+import HighchartsExportData from 'highcharts/modules/export-data';
+import { BarChart3, LineChart, PieChart, TrendingUp, Grid3X3, Group, TrendingDown } from 'lucide-react';
+
+// Initialize modules
+// if (typeof Highcharts === 'object') {
+//   HighchartsTreemap(Highcharts);
+//   HighchartsExporting(Highcharts);
+//   HighchartsExportData(Highcharts);
+// }
 
 interface IndikatorDetailData {
   id: number;
@@ -29,7 +39,7 @@ interface ChartViewProps {
   fullData: IndikatorDetailData[];
 }
 
-type ChartType = 'column' | 'line' | 'pie' | 'combo' | 'scatter';
+type ChartType = 'column' | 'line' | 'pie' | 'combo' | 'treemap';
 type GroupByType = 'tahun' | 'wilayah';
 
 export default function ChartView({ data, fullData }: ChartViewProps) {
@@ -197,6 +207,26 @@ export default function ChartView({ data, fullData }: ChartViewProps) {
 
     const { years, locations, fieldData, fieldNames, satuan, processedData, hasIndonesiaData } = chartData;
 
+    // Common export menu configuration
+    const exportingConfig = {
+      enabled: true,
+      buttons: {
+        contextButton: {
+          menuItems: [
+            'viewFullscreen',
+            'separator',
+            'downloadPNG',
+            'downloadJPEG',
+            'downloadPDF',
+            'downloadSVG',
+            'separator',
+            'downloadCSV',
+            'downloadXLS'
+          ]
+        }
+      }
+    };
+
     // For non-column/line charts, use 'tahun' mode data structure by default
     const getDefaultSeriesData = () => {
       const series: any[] = [];
@@ -320,7 +350,8 @@ export default function ChartView({ data, fullData }: ChartViewProps) {
             column: {
               dataLabels: { enabled: false }
             }
-          }
+          },
+          exporting: exportingConfig
         };
 
       case 'line':
@@ -346,7 +377,8 @@ export default function ChartView({ data, fullData }: ChartViewProps) {
               dataLabels: { enabled: false },
               marker: { enabled: true }
             }
-          }
+          },
+          exporting: exportingConfig
         };
 
       case 'pie':
@@ -389,111 +421,191 @@ export default function ChartView({ data, fullData }: ChartViewProps) {
                 format: '<b>{point.name}</b>: {point.percentage:.1f} %'
               }
             }
-          }
+          },
+          exporting: exportingConfig
         };
 
       case 'combo':
-        // For combo chart, calculate average across all fieldNames and locations
-        const avgData = years.map(year => {
-          const allValues: number[] = [];
-          fieldNames.forEach(fieldName => {
-            const locationData = fieldData.get(fieldName);
-            if (locationData) {
-              locations.forEach(location => {
-                const value = locationData.get(location)?.[year];
-                if (value !== undefined) allValues.push(value);
-              });
-            }
+        // For combo chart, calculate average for each category based on current groupBy mode
+        let comboAvgData: (number | null)[] = [];
+        let comboCategories: string[] = [];
+        let comboColumnSeries: any[] = [];
+        
+        // Use first 3 series from processedData for columns
+        comboColumnSeries = processedData.series.map((s: any) => ({ 
+          ...s, 
+          type: 'column' as const 
+        }));
+        
+        comboCategories = processedData.categories;
+        
+        if (groupBy === 'tahun') {
+          // x-axis = years, calculate average of the displayed series for each year
+          comboAvgData = processedData.categories.map((category: string, categoryIndex: number) => {
+            const valuesForThisCategory: number[] = [];
+            
+            // Only use the first 3 series (the ones being displayed as columns)
+            comboColumnSeries.forEach(series => {
+              const value = series.data[categoryIndex];
+              if (value !== undefined && value !== null && !isNaN(value)) {
+                valuesForThisCategory.push(value);
+              }
+            });
+            
+            return valuesForThisCategory.length > 0 
+              ? valuesForThisCategory.reduce((a, b) => a + b, 0) / valuesForThisCategory.length 
+              : null;
           });
-          return allValues.length > 0 ? allValues.reduce((a, b) => a + b, 0) / allValues.length : null;
-        });
-
-        const defaultSeries = getDefaultSeriesData();
-        const comboSeries = defaultSeries.slice(0, 3).map(s => ({ ...s, type: 'column' as const, yAxis: 'primary' }));
+        } else {
+          // x-axis = locations, calculate average of the displayed series for each location
+          comboAvgData = processedData.categories.map((category: string, categoryIndex: number) => {
+            const valuesForThisCategory: number[] = [];
+            
+            // Only use the first 3 series (the ones being displayed as columns)
+            comboColumnSeries.forEach(series => {
+              const value = series.data[categoryIndex];
+              if (value !== undefined && value !== null && !isNaN(value)) {
+                valuesForThisCategory.push(value);
+              }
+            });
+            
+            return valuesForThisCategory.length > 0 
+              ? valuesForThisCategory.reduce((a, b) => a + b, 0) / valuesForThisCategory.length 
+              : null;
+          });
+        }
 
         return {
           chart: { type: 'line' },
           title: { text: chartTitle },
           xAxis: { 
-            categories: years.map(String),
-            title: { text: 'Tahun' }
-          },
-          yAxis: [
-            { 
-              title: { text: `Nilai (${satuan})` },
-              id: 'primary'
-            },
-            {
-              title: { text: 'Rata-rata' },
-              opposite: true,
-              id: 'secondary'
-            }
-          ],
-          series: [
-            ...comboSeries,
-            {
-              name: 'Rata-rata',
-              type: 'line' as const,
-              yAxis: 'secondary',
-              data: avgData,
-              marker: { enabled: true },
-              color: '#FF6B6B'
-            }
-          ]
-        };
-
-      case 'scatter':
-        // For scatter plot, combine data from all fieldNames
-        const scatterData: Array<{ name: string; data: Array<[number, number]> }> = [];
-        
-        fieldNames.forEach(fieldName => {
-          const locationData = fieldData.get(fieldName);
-          if (!locationData) return;
-          
-          locations.forEach(location => {
-            const locationPoints = years.map(year => {
-              const value = locationData.get(location)?.[year];
-              return value !== undefined ? [year, value] as [number, number] : null;
-            }).filter(Boolean) as Array<[number, number]>;
-            
-            if (locationPoints.length > 0) {
-              scatterData.push({
-                name: `${location} - ${fieldName}`,
-                data: locationPoints
-              });
-            }
-          });
-        });
-
-        return {
-          chart: { type: 'scatter' },
-          title: { text: chartTitle },
-          xAxis: { 
-            title: { text: 'Tahun' },
-            type: 'linear'
+            categories: comboCategories,
+            title: { text: processedData.xAxisTitle }
           },
           yAxis: { 
             title: { text: `Nilai (${satuan})` }
           },
-          series: scatterData.map(series => ({
-            name: series.name,
-            type: 'scatter' as const,
-            data: series.data
-          })),
+          series: [
+            ...comboColumnSeries,
+            {
+              name: `Rata-rata (${groupBy === 'tahun' ? 'per Tahun' : 'per Wilayah'})`,
+              type: 'line' as const,
+              data: comboAvgData,
+              marker: { 
+                enabled: true,
+                symbol: 'diamond',
+                radius: 6
+              },
+              color: '#FF6B6B',
+              lineWidth: 3,
+              dashStyle: 'Dash'
+            }
+          ],
           plotOptions: {
-            scatter: {
-              marker: {
-                radius: 5,
-                states: {
-                  hover: {
-                    enabled: true,
-                    lineColor: 'rgb(100,100,100)'
-                  }
+            column: {
+              dataLabels: { enabled: false }
+            },
+            line: {
+              dataLabels: { enabled: false }
+            }
+          },
+          exporting: exportingConfig
+        };
+
+      case 'treemap':
+        // For treemap, create hierarchical structure based on groupBy mode
+        const treemapData: Array<{ name: string; value: number; colorValue?: number }> = [];
+        
+        if (groupBy === 'tahun') {
+          // Group by years - show latest data for each location-fieldName combination
+          const latestYear = Math.max(...years);
+          fieldNames.forEach(fieldName => {
+            const locationData = fieldData.get(fieldName);
+            if (!locationData) return;
+            
+            locations.forEach(location => {
+              const value = locationData.get(location)?.[latestYear] || 0;
+              if (value > 0) {
+                treemapData.push({
+                  name: `${location} - ${fieldName}`,
+                  value: value,
+                  colorValue: value
+                });
+              }
+            });
+          });
+          
+          return {
+            chart: { type: 'treemap' },
+            title: { text: `${chartTitle} (${latestYear})` },
+            colorAxis: {
+              minColor: '#FFFFFF',
+              maxColor: '#3B82F6'
+            },
+            series: [{
+              type: 'treemap',
+              layoutAlgorithm: 'squarified',
+              data: treemapData,
+              dataLabels: {
+                enabled: true,
+                format: '{point.name}<br/>{point.value:.2f}',
+                style: {
+                  fontSize: '12px'
                 }
               }
-            }
-          }
-        };
+            }],
+            tooltip: {
+              pointFormat: '<b>{point.name}</b><br/>Nilai: {point.value:.2f} ' + satuan
+            },
+            exporting: exportingConfig
+          };
+        } else {
+          // Group by wilayah - show average across all years for each location-fieldName combination
+          fieldNames.forEach(fieldName => {
+            const locationData = fieldData.get(fieldName);
+            if (!locationData) return;
+            
+            locations.forEach(location => {
+              const locationValues = locationData.get(location);
+              if (!locationValues) return;
+              
+              const values = Object.values(locationValues).filter(v => v !== undefined && v !== null);
+              if (values.length > 0) {
+                const avgValue = values.reduce((a, b) => a + b, 0) / values.length;
+                treemapData.push({
+                  name: `${location} - ${fieldName}`,
+                  value: avgValue,
+                  colorValue: avgValue
+                });
+              }
+            });
+          });
+          
+          return {
+            chart: { type: 'treemap' },
+            title: { text: `${chartTitle} (Rata-rata ${years[0]}-${years[years.length-1]})` },
+            colorAxis: {
+              minColor: '#FFFFFF',
+              maxColor: '#3B82F6'
+            },
+            series: [{
+              type: 'treemap',
+              layoutAlgorithm: 'squarified',
+              data: treemapData,
+              dataLabels: {
+                enabled: true,
+                format: '{point.name}<br/>{point.value:.2f}',
+                style: {
+                  fontSize: '12px'
+                }
+              }
+            }],
+            tooltip: {
+              pointFormat: '<b>{point.name}</b><br/>Rata-rata: {point.value:.2f} ' + satuan
+            },
+            exporting: exportingConfig
+          };
+        }
 
       default:
         return {};
@@ -503,9 +615,9 @@ export default function ChartView({ data, fullData }: ChartViewProps) {
   const chartTypeOptions = [
     { value: 'column', label: 'Column Chart', icon: BarChart3 },
     { value: 'line', label: 'Line Chart', icon: LineChart },
-    { value: 'pie', label: 'Pie Chart', icon: PieChart },
     { value: 'combo', label: 'Combo Chart', icon: TrendingUp },
-    { value: 'scatter', label: 'Scatter Plot', icon: ScatterChart }
+    { value: 'pie', label: 'Pie Chart', icon: PieChart },
+    // { value: 'treemap', label: 'Treemap', icon: Grid3X3 }
   ];
 
   const groupByOptions = [
@@ -564,7 +676,7 @@ export default function ChartView({ data, fullData }: ChartViewProps) {
         </div>
 
           {/* Group By Selection - Only show for column and line charts */}
-        {(chartType === 'column' || chartType === 'line') && (
+        {(chartType === 'column' || chartType === 'line' || chartType === 'combo') && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
