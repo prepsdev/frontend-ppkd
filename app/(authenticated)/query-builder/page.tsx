@@ -62,6 +62,7 @@ export default function QueryBuilderPage() {
   // Search states
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredTemaData, setFilteredTemaData] = useState<TemaData[]>([]);
+  const [isSearchLoading, setIsSearchLoading] = useState(false);
   
   // Accordion states
   const [expandedTemas, setExpandedTemas] = useState<Set<string>>(new Set());
@@ -122,8 +123,7 @@ export default function QueryBuilderPage() {
         if (result.success) {
           setTemaData(result.data);
           setFilteredTemaData(result.data);
-          // Pre-load all indikators for search functionality
-          await preloadAllIndikators(result.data);
+          // Remove preloading - load indikators on demand instead
         } else {
           setError(result.message || 'Failed to load data');
         }
@@ -137,18 +137,8 @@ export default function QueryBuilderPage() {
     fetchTemaData();
   }, []);
 
-  // Pre-load all indikators for better search functionality
-  const preloadAllIndikators = async (temas: TemaData[]) => {
-    const promises: Promise<void>[] = [];
-    
-    temas.forEach(tema => {
-      tema.topik_list.forEach(topik => {
-        promises.push(fetchTopikIndikators(topik.topik_uri));
-      });
-    });
-
-    await Promise.all(promises);
-  };
+  // Remove the preloadAllIndikators function as it's no longer needed
+  // Indikators will be loaded on-demand when temas are expanded
 
   // Handle search functionality - now searches through all data including indikators
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,10 +150,42 @@ export default function QueryBuilderPage() {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Set new timeout for debounced search
+    // Immediately filter with current data
+    filterData(query);
+
+    // Set new timeout for debounced indikator loading
     searchTimeoutRef.current = setTimeout(() => {
-      filterData(query);
+      // If searching and query is not empty, preload indikators for better search results
+      if (query.trim()) {
+        preloadIndikatorForSearch(query);
+      }
     }, 300);
+  };
+
+  // Preload indikators for search functionality
+  const preloadIndikatorForSearch = async (query: string) => {
+    setIsSearchLoading(true);
+    
+    const topikUrisToLoad = temaData.flatMap(tema => 
+      tema.topik_list.map(topik => topik.topik_uri)
+    ).filter(uri => !topikIndikators.has(uri) && !loadingTopiks.has(uri));
+
+    if (topikUrisToLoad.length === 0) {
+      setIsSearchLoading(false);
+      return;
+    }
+
+    // Limit concurrent requests to avoid overwhelming the server
+    const batchSize = 5;
+    for (let i = 0; i < topikUrisToLoad.length; i += batchSize) {
+      const batch = topikUrisToLoad.slice(i, i + batchSize);
+      await Promise.all(batch.map(uri => fetchTopikIndikators(uri)));
+      
+      // Re-filter data after each batch to show progressive results
+      filterData(query);
+    }
+    
+    setIsSearchLoading(false);
   };
 
   const filterData = (query: string) => {
@@ -172,17 +194,19 @@ export default function QueryBuilderPage() {
       return;
     }
 
+    const queryLower = query.toLowerCase();
+
     const filtered = temaData.map(tema => {
-      // Filter topik based on search query and indikator content
+      // Filter topik based on search query
       const filteredTopiks = tema.topik_list.filter(topik => {
         // Check if topik or tema matches
-        const topikMatches = topik.topik.toLowerCase().includes(query.toLowerCase()) ||
-                           tema.tema.toLowerCase().includes(query.toLowerCase());
+        const topikMatches = topik.topik.toLowerCase().includes(queryLower) ||
+                           tema.tema.toLowerCase().includes(queryLower);
         
-        // Check if any indikator in this topik matches
+        // Check if any indikator in this topik matches (if indikators are loaded)
         const indikators = topikIndikators.get(topik.topik_uri) || [];
         const indikatorMatches = indikators.some(indikator => 
-          indikator.indikator.toLowerCase().includes(query.toLowerCase())
+          indikator.indikator.toLowerCase().includes(queryLower)
         );
         
         return topikMatches || indikatorMatches;
@@ -193,7 +217,7 @@ export default function QueryBuilderPage() {
         topik_list: filteredTopiks
       };
     }).filter(tema => 
-      tema.tema.toLowerCase().includes(query.toLowerCase()) || 
+      tema.tema.toLowerCase().includes(queryLower) || 
       tema.topik_list.length > 0
     );
 
@@ -208,6 +232,13 @@ export default function QueryBuilderPage() {
       newExpanded.delete(tema);
     } else {
       newExpanded.add(tema);
+      // Load indikators for all topiks in this tema when expanded
+      const temaData = filteredTemaData.find(t => t.tema === tema);
+      if (temaData) {
+        temaData.topik_list.forEach(topik => {
+          fetchTopikIndikators(topik.topik_uri);
+        });
+      }
     }
     
     setExpandedTemas(newExpanded);
@@ -355,7 +386,11 @@ export default function QueryBuilderPage() {
     return (
       <div className="px-4 py-6 sm:px-0">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Memuat daftar tema dan topik...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Indikator akan dimuat saat diperlukan</p>
+          </div>
         </div>
       </div>
     );
@@ -495,7 +530,7 @@ export default function QueryBuilderPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-gray-200 dark:divide-gray-700">
           
           {/* Left Content - Tema & Indikator List */}
-          <div className="border-2 border-blue-200 dark:border-blue-800 rounded-l-xl lg:rounded-r-none rounded-r-xl">
+          <div className="border-2 border-gray-200 dark:border-gray-800 rounded-l-xl lg:rounded-r-none rounded-r-xl">
             {/* Search Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
@@ -509,8 +544,19 @@ export default function QueryBuilderPage() {
                   onChange={handleSearchChange}
                   className="w-full px-4 py-3 pr-12 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200"
                 />
-                <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                {isSearchLoading ? (
+                  <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : (
+                  <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                )}
               </div>
+              {isSearchLoading && searchQuery && (
+                <div className="px-6 py-2 text-sm text-blue-600 dark:text-blue-400">
+                  Memuat indikator untuk pencarian yang lebih lengkap...
+                </div>
+              )}
             </div>
 
             {/* Tema List */}
@@ -555,9 +601,13 @@ export default function QueryBuilderPage() {
                                 </div>
                                 
                                 {isLoading ? (
-                                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+                                  <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 py-2">
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                                    Loading indikators...
+                                    Memuat indikator...
+                                  </div>
+                                ) : indikators.length === 0 ? (
+                                  <div className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                                    Tidak ada indikator tersedia
                                   </div>
                                 ) : (
                                   <div className="space-y-1">
@@ -599,7 +649,7 @@ export default function QueryBuilderPage() {
           </div>
 
           {/* Right Content - Selected Indikators */}
-          <div className="border-2 border-green-200 dark:border-green-800 rounded-r-xl lg:rounded-l-none rounded-l-xl">
+          <div className="border-2 border-gray-200 dark:border-gray-800 rounded-r-xl lg:rounded-l-none rounded-l-xl">
             {/* Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">

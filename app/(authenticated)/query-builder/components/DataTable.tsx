@@ -103,11 +103,11 @@ export default function DataTable({ data }: DataTableProps) {
         <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
-              <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                 Provinsi
               </th>
               {hasKotaData && (
-                <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700" style={{ left: '200px' }}>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700">
                   Kota/Kabupaten
                 </th>
               )}
@@ -119,9 +119,9 @@ export default function DataTable({ data }: DataTableProps) {
             </tr>
             {uniqueFieldKeys.length > 1 && (
               <tr>
-                <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-6 py-2 border-r border-gray-200 dark:border-gray-700"></th>
+                <th className="px-6 py-2 border-r border-gray-200 dark:border-gray-700"></th>
                 {hasKotaData && (
-                  <th className="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-6 py-2 border-r border-gray-200 dark:border-gray-700" style={{ left: '200px' }}></th>
+                  <th className="px-6 py-2 border-r border-gray-200 dark:border-gray-700"></th>
                 )}
                 {uniqueYears.map(year => 
                   uniqueFieldKeys.map((fieldKey, index) => (
@@ -145,11 +145,11 @@ export default function DataTable({ data }: DataTableProps) {
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {Object.entries(groupedData).map(([key, group]) => (
               <tr key={key} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-150">
-                <td className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white border-r border-gray-200 dark:border-gray-700">
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white border-r border-gray-200 dark:border-gray-700">
                   {group.provinsi}
                 </td>
                 {hasKotaData && (
-                  <td className="sticky left-0 z-10 bg-white dark:bg-gray-800 px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white border-r border-gray-200 dark:border-gray-700" style={{ left: '200px' }}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white border-r border-gray-200 dark:border-gray-700">
                     {group.kota || '-'}
                   </td>
                 )}

@@ -144,7 +144,11 @@ export default function BankDataPage() {
     return (
       <div className="px-4 py-6 sm:px-0">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 dark:text-gray-400">Memuat data tema dan topik...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">Mohon tunggu sebentar</p>
+          </div>
         </div>
       </div>
     );
@@ -259,34 +263,51 @@ export default function BankDataPage() {
 
       {/* Topic Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {temaData.map((tema, index) => (
-          <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200">
-            <div className="flex items-center mb-4">
-              <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mr-3">
-                <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+        {temaData.length === 0 ? (
+          // Skeleton loading for cards
+          Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm animate-pulse">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg mr-3"></div>
+                <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {tema.tema}
-              </h3>
+              <div className="space-y-2">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-4/6"></div>
+              </div>
             </div>
-            <div className="space-y-2">
-              {tema.topik_list.slice(0, 3).map((topik, topikIndex) => (
-                <Link
-                  key={topikIndex}
-                  href={`/topik/${encodeURIComponent(topik.topik_uri)}`}
-                  className="block text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors duration-200"
-                >
-                  • {topik.topik}
-                </Link>
-              ))}
-              {tema.topik_list.length > 3 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  +{tema.topik_list.length - 3} topik lainnya
-                </p>
-              )}
+          ))
+        ) : (
+          temaData.map((tema, index) => (
+            <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm hover:shadow-md transition-all duration-200">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center mr-3">
+                  <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {tema.tema}
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {tema.topik_list.slice(0, 3).map((topik, topikIndex) => (
+                  <Link
+                    key={topikIndex}
+                    href={`/topik/${encodeURIComponent(topik.topik_uri)}`}
+                    className="block text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline transition-colors duration-200"
+                  >
+                    • {topik.topik}
+                  </Link>
+                ))}
+                {tema.topik_list.length > 3 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    +{tema.topik_list.length - 3} topik lainnya
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
